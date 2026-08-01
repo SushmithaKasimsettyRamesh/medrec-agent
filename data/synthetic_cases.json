@@ -1,0 +1,30 @@
+[
+  {
+    "case_id": "PT-001",
+    "patient_name": "Jordan Ellis",
+    "mrn": "MRN-88213",
+    "chief_complaint": "GI bleeding, dark stools for 2 days",
+    "discharge_note": "Patient Jordan Ellis (MRN-88213) presents with dark tarry stools for two days and reports lightheadedness. Home medications per patient report include warfarin 5mg daily for atrial fibrillation, metoprolol 25mg twice daily, and omeprazole 20mg daily. Patient also takes ibuprofen occasionally for knee pain, last dose yesterday. Contact number 555-0110. No known drug allergies."
+  },
+  {
+    "case_id": "PT-002",
+    "patient_name": "Maria Alonso",
+    "mrn": "MRN-77410",
+    "chief_complaint": "Altered mental status, found confused at home",
+    "discharge_note": "Maria Alonso (MRN-77410) brought in by family after being found confused and difficult to wake. Home medications include insulin glargine 20 units nightly for type 2 diabetes, metformin 1000mg twice daily, and lisinopril 10mg daily. Family reports she may have skipped meals yesterday. Emergency contact 555-0148."
+  },
+  {
+    "case_id": "PT-003",
+    "patient_name": "Devon Ruiz",
+    "mrn": "MRN-65029",
+    "chief_complaint": "Chest pain, shortness of breath",
+    "discharge_note": "Devon Ruiz (MRN-65029) presents with acute chest pain and shortness of breath, onset one hour ago. Home medications include aspirin 81mg daily, clopidogrel 75mg daily following prior stent placement, and atorvastatin 40mg nightly. Patient reports no missed doses. Phone 555-0192."
+  },
+  {
+    "case_id": "PT-004",
+    "patient_name": "Priya Nair",
+    "mrn": "MRN-90355",
+    "chief_complaint": "Ankle sprain after fall",
+    "discharge_note": "Priya Nair (MRN-90355) presents after twisting her ankle while walking. No head injury, ambulatory on arrival. Home medications include levothyroxine 75mcg daily and a daily multivitamin. No other significant history. Contact 555-0173."
+  }
+]
