@@ -1,151 +1,85 @@
 """
-app.py
+gemma_client.py
 
-Streamlit dashboard. Orchestrates the full pipeline:
+Thin wrapper around Google's Generative Language API for calling Gemma
+models. Uses the same API surface as Gemini, just with a Gemma model name.
 
-  1. Load a synthetic patient case
-  2. Anonymize the discharge note (privacy.py)          <- privacy layer
-  3. Extract medications from the anonymized note (medication_extractor.py)
-  4. Score each medication for urgency (risk_engine.py)
-  5. Generate a plain-language explanation per flag (gemma_client.py + prompts.py)
-  6. Display a prioritized, pharmacist-facing list
-
-Run with:  streamlit run app.py
+Get your API key at https://aistudio.google.com -> "Get API Key", then
+either put it in your .env file locally as GEMMA_API_KEY=..., or in
+Streamlit Cloud's Secrets panel as GEMMA_API_KEY = "..." for the deployed app.
 """
 
-import json
-import streamlit as st
+import os
+import requests
+from dotenv import load_dotenv
 
-from privacy import PrivacyShield
-from medication_extractor import extract_medications
-from risk_engine import score_all
-from prompts import build_explanation_prompt
-from gemma_client import GemmaClient
-
-st.set_page_config(page_title="Med Rec Agent", page_icon="💊", layout="wide")
-
-TIER_COLORS = {"urgent": "🔴", "priority": "🟡", "routine": "🟢"}
+load_dotenv()
 
 
-@st.cache_resource
-def get_privacy_shield():
-    return PrivacyShield()
-
-
-@st.cache_resource
-def get_gemma_client():
+def _get_secret(key: str, default=None):
+    """
+    Looks for a config value in this order:
+    1. Streamlit secrets (works when deployed on Streamlit Cloud)
+    2. Environment variables (works with .env locally)
+    This covers both local runs and Streamlit Cloud deployment without
+    needing separate code paths.
+    """
     try:
-        return GemmaClient()
-    except RuntimeError:
-        return None  # allow the app to load even without an API key set yet
+        import streamlit as st
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass  # not running inside Streamlit, or no secrets configured
+
+    return os.getenv(key, default)
 
 
-@st.cache_data
-def load_cases():
-    with open("data/synthetic_cases.json") as f:
-        return json.load(f)
+_API_KEY = _get_secret("GEMMA_API_KEY")
+_MODEL = _get_secret("GEMMA_MODEL", "gemma-3-27b-it")
+_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
-def run_pipeline(case: dict, gemma: GemmaClient | None):
-    shield = get_privacy_shield()
-
-    # Step 1: strip PII before anything touches the model
-    anonymized_note, mapping = shield.anonymize(case["discharge_note"])
-
-    # Step 2: extract medications from the anonymized text
-    medications = extract_medications(anonymized_note)
-
-    # Step 3: rule-based risk scoring
-    scored = score_all(medications, case["chief_complaint"])
-
-    # Step 4: generate an explanation per flagged medication
-    for item in scored:
-        if gemma is None:
-            item["explanation"] = (
-                "[Add GEMMA_API_KEY in .env to generate live explanations. "
-                f"Rule-based reason: {item['reason']}]"
+class GemmaClient:
+    def __init__(self, api_key: str | None = None, model: str | None = None):
+        self.api_key = api_key or _API_KEY
+        self.model = model or _MODEL
+        if not self.api_key or self.api_key == "your_api_key_here":
+            raise RuntimeError(
+                "GEMMA_API_KEY is not set. Add it to your .env file locally, "
+                "or to Streamlit Cloud's Secrets panel when deployed. "
+                "Get a key at https://aistudio.google.com"
             )
-            continue
-        prompt = build_explanation_prompt(
-            medication=item["medication"],
-            dosage=item["dosage"],
-            tier=item["tier"],
-            rule_reason=item["reason"],
-            chief_complaint=case["chief_complaint"],
-            anonymized_note=anonymized_note,
-        )
+
+    def generate(self, prompt: str, temperature: float = 0.3, max_tokens: int = 300) -> str:
+        """
+        Sends a single-turn prompt to Gemma and returns the text response.
+        Kept intentionally simple (no chat history) since every call in
+        this project is a fresh, self-contained request.
+        """
+        url = f"{_BASE_URL}/{self.model}:generateContent?key={self.api_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens,
+            },
+        }
+
+        response = requests.post(url, json=payload, timeout=30)
+
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Gemma API error {response.status_code}: {response.text}"
+            )
+
+        data = response.json()
         try:
-            item["explanation"] = gemma.generate(prompt)
-        except RuntimeError as e:
-            item["explanation"] = f"[Gemma call failed: {e}]"
-
-    return anonymized_note, mapping, scored
-
-
-def main():
-    st.title("💊 Medication Reconciliation Assistant")
-    st.caption(
-        "Privacy-first, agentic decision support for ER medication reconciliation. "
-        "Patient data is anonymized before it ever reaches the model."
-    )
-
-    cases = load_cases()
-    gemma = get_gemma_client()
-
-    if gemma is None:
-        st.warning(
-            "No GEMMA_API_KEY found in .env. Explanations will show the "
-            "rule-based reasoning only. Add your key from aistudio.google.com "
-            "to enable live Gemma explanations.",
-            icon="⚠️",
-        )
-
-    case_labels = [f"{c['case_id']} — {c['chief_complaint']}" for c in cases]
-    selected_idx = st.selectbox(
-        "Select a patient case", range(len(cases)),
-        format_func=lambda i: case_labels[i],
-    )
-    case = cases[selected_idx]
-
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        st.subheader("Chief complaint")
-        st.write(case["chief_complaint"])
-
-        st.subheader("Discharge note (raw, contains PII)")
-        st.text_area("Raw note", case["discharge_note"], height=160, disabled=True, label_visibility="collapsed")
-
-    if st.button("Run medication reconciliation", type="primary"):
-        with st.spinner("Anonymizing, extracting medications, scoring risk..."):
-            anonymized_note, mapping, scored = run_pipeline(case, gemma)
-
-        with col2:
-            st.subheader("Anonymized note (what the model actually sees)")
-            st.text_area("Anonymized", anonymized_note, height=160, disabled=True, label_visibility="collapsed")
-            st.caption(f"{len(mapping)} PII item(s) stripped before reaching Gemma.")
-
-        st.divider()
-        st.subheader("Prioritized medication list")
-
-        if not scored:
-            st.info("No known medications detected in this note.")
-        else:
-            for item in scored:
-                icon = TIER_COLORS.get(item["tier"], "⚪")
-                with st.container(border=True):
-                    st.markdown(
-                        f"### {icon} {item['medication'].title()} — {item['dosage']}  "
-                        f"`{item['tier'].upper()}`"
-                    )
-                    st.write(item["explanation"])
-
-    st.divider()
-    st.caption(
-        "Decision-support only. Not a diagnostic tool. All patient data on "
-        "this screen is synthetic. Built for Build with Gemma NYC."
-    )
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except (KeyError, IndexError):
+            raise RuntimeError(f"Unexpected Gemma API response shape: {data}")
 
 
 if __name__ == "__main__":
-    main()
+    # Quick manual test: python gemma_client.py
+    client = GemmaClient()
+    print(client.generate("Say hello in five words."))
