@@ -75,7 +75,7 @@ def run_pipeline(case: dict, gemma: GemmaClient | None):
             anonymized_note=anonymized_note,
         )
         try:
-            item["explanation"] = gemma.generate(prompt)
+            item["explanation"] = gemma.generate(prompt, fallback=item["reason"])
         except RuntimeError as e:
             item["explanation"] = f"[Gemma call failed: {e}]"
 
