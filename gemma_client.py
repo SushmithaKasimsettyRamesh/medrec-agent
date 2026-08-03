@@ -10,6 +10,7 @@ Streamlit Cloud's Secrets panel as GEMMA_API_KEY = "..." for the deployed app.
 """
 
 import os
+import re
 import requests
 from dotenv import load_dotenv
 
@@ -34,8 +35,18 @@ def _get_secret(key: str, default=None):
     return os.getenv(key, default)
 
 
+def _extract_answer(text: str) -> str:
+    """
+    Pulls just the content inside <answer>...</answer> tags. Falls back
+    to the raw text if the model didn't produce the tag for some reason,
+    so the app never shows a blank explanation.
+    """
+    match = re.search(r"<answer>(.*?)</answer>", text, re.DOTALL)
+    return match.group(1).strip() if match else text.strip()
+
+
 _API_KEY = _get_secret("GEMMA_API_KEY")
-_MODEL = _get_secret("GEMMA_MODEL", "gemma-3-4b-it")
+_MODEL = _get_secret("GEMMA_MODEL", "gemma-4-26b-a4b-it")
 _BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
@@ -50,11 +61,13 @@ class GemmaClient:
                 "Get a key at https://aistudio.google.com"
             )
 
-    def generate(self, prompt: str, temperature: float = 0.3, max_tokens: int = 300) -> str:
+    def generate(self, prompt: str, temperature: float = 0.3, max_tokens: int = 400) -> str:
         """
         Sends a single-turn prompt to Gemma and returns the text response.
         Kept intentionally simple (no chat history) since every call in
-        this project is a fresh, self-contained request.
+        this project is a fresh, self-contained request. Extracts only
+        the <answer>...</answer> portion so any model "thinking out loud"
+        beforehand never reaches the UI.
         """
         url = f"{_BASE_URL}/{self.model}:generateContent?key={self.api_key}"
         payload = {
@@ -74,9 +87,11 @@ class GemmaClient:
 
         data = response.json()
         try:
-            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         except (KeyError, IndexError):
             raise RuntimeError(f"Unexpected Gemma API response shape: {data}")
+
+        return _extract_answer(raw)
 
 
 if __name__ == "__main__":
