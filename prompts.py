@@ -1,7 +1,6 @@
 """
 prompts.py
-All prompt templates in one place so they're easy to tune fast during
-the hackathon without hunting through app.py.
+All prompt templates in one place.
 """
 SYSTEM_INSTRUCTION = (
     "You are a decision-support assistant helping a pharmacist prioritize "
@@ -15,11 +14,6 @@ SYSTEM_INSTRUCTION = (
 def build_explanation_prompt(medication: str, dosage: str, tier: str,
                               rule_reason: str, chief_complaint: str,
                               anonymized_note: str) -> str:
-    """
-    Builds the prompt sent to Gemma to generate a pharmacist-facing
-    explanation for one flagged medication. Note: `anonymized_note` must
-    already have PII stripped out by privacy.py before it reaches here.
-    """
     return f"""{SYSTEM_INSTRUCTION}
 Patient chief complaint: {chief_complaint}
 Medication under review: {medication} ({dosage})
@@ -39,10 +33,6 @@ Nothing should appear after the closing </answer> tag.
 """
 
 def build_summary_prompt(scored_medications: list, chief_complaint: str) -> str:
-    """
-    Optional: builds a prompt for a one-paragraph overall case summary,
-    useful if you want a top-of-dashboard summary line.
-    """
     med_lines = "\n".join(
         f"- {m['medication']} ({m['dosage']}): {m['tier']}"
         for m in scored_medications
