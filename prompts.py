@@ -32,11 +32,10 @@ clinical language, that justifies this urgency tier. Do not repeat the
 rule-based reasoning word for word, restate it naturally as if explaining
 to a colleague. Do not add new medications or new claims not supported
 above.
-
-Output format: respond with ONLY the final one-to-two sentence explanation.
-Do not restate or repeat any part of this prompt. Do not show reasoning,
-steps, or self-corrections. Do not prefix with labels like "Explanation:".
-Your entire response must be just the explanation sentence(s), nothing else.
+You may think through this internally, but your response must end with
+the final explanation wrapped in tags exactly like this:
+<answer>The explanation goes here.</answer>
+Nothing should appear after the closing </answer> tag.
 """
 
 def build_summary_prompt(scored_medications: list, chief_complaint: str) -> str:
@@ -54,8 +53,8 @@ Flagged medications:
 {med_lines}
 Write a two sentence summary for the pharmacist dashboard, highlighting
 the most urgent item first. Plain language, no new clinical claims.
-
-Output format: respond with ONLY the two sentence summary. Do not restate
-this prompt, show reasoning, or add labels. Your entire response must be
-just the summary.
+You may think through this internally, but your response must end with
+the final summary wrapped in tags exactly like this:
+<answer>The summary goes here.</answer>
+Nothing should appear after the closing </answer> tag.
 """
