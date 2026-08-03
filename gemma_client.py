@@ -5,7 +5,8 @@ Thin wrapper around Google's Generative Language API for calling Gemma
 models. Uses the same API surface as Gemini, just with a Gemma model name.
 
 Get your API key at https://aistudio.google.com -> "Get API Key", then
-put it in your .env file as GEMMA_API_KEY=...
+either put it in your .env file locally as GEMMA_API_KEY=..., or in
+Streamlit Cloud's Secrets panel as GEMMA_API_KEY = "..." for the deployed app.
 """
 
 import os
@@ -14,8 +15,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-_API_KEY = os.getenv("GEMMA_API_KEY")
-_MODEL = os.getenv("GEMMA_MODEL", "gemma-3-27b-it")
+
+def _get_secret(key: str, default=None):
+    """
+    Looks for a config value in this order:
+    1. Streamlit secrets (works when deployed on Streamlit Cloud)
+    2. Environment variables (works with .env locally)
+    This covers both local runs and Streamlit Cloud deployment without
+    needing separate code paths.
+    """
+    try:
+        import streamlit as st
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass  # not running inside Streamlit, or no secrets configured
+
+    return os.getenv(key, default)
+
+
+_API_KEY = _get_secret("GEMMA_API_KEY")
+_MODEL = _get_secret("GEMMA_MODEL", "gemma-3-4b-it")
 _BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
@@ -25,7 +45,8 @@ class GemmaClient:
         self.model = model or _MODEL
         if not self.api_key or self.api_key == "your_api_key_here":
             raise RuntimeError(
-                "GEMMA_API_KEY is not set. Add it to your .env file. "
+                "GEMMA_API_KEY is not set. Add it to your .env file locally, "
+                "or to Streamlit Cloud's Secrets panel when deployed. "
                 "Get a key at https://aistudio.google.com"
             )
 
