@@ -61,7 +61,7 @@ class GemmaClient:
                 "Get a key at https://aistudio.google.com"
             )
 
-    def generate(self, prompt: str, temperature: float = 0.3, max_tokens: int = 400) -> str:
+    def generate(self, prompt: str, temperature: float = 0.3, max_tokens: int = 1024) -> str:
         """
         Sends a single-turn prompt to Gemma and returns the text response.
         Kept intentionally simple (no chat history) since every call in
