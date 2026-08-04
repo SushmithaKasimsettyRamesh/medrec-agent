@@ -46,6 +46,16 @@ def load_cases():
         return json.load(f)
 
 
+def _fallback_text(item: dict) -> str:
+    reason = item.get("reason")
+    if reason:
+        return reason
+    return (
+        f"No specific concern flagged for {item['medication']} given this "
+        "complaint; routine reconciliation."
+    )
+
+
 def run_pipeline(case: dict, gemma: GemmaClient | None):
     shield = get_privacy_shield()
 
@@ -75,7 +85,7 @@ def run_pipeline(case: dict, gemma: GemmaClient | None):
             anonymized_note=anonymized_note,
         )
         try:
-            item["explanation"] = gemma.generate(prompt, fallback=item["reason"])
+            item["explanation"] = gemma.generate(prompt, fallback=_fallback_text(item))
         except RuntimeError as e:
             item["explanation"] = f"[Gemma call failed: {e}]"
 
